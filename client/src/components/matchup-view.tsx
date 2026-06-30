@@ -76,32 +76,43 @@ export function MatchupView() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="grid flex-1 grid-cols-2 gap-3 md:gap-6">
-        {loading || !matchup ? (
-          <>
-            <PlayerCardSkeleton />
-            <PlayerCardSkeleton />
-          </>
-        ) : (
-          matchup.players.map((player) => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              disabled={voting}
-              selected={selectedId === player.id}
-              onVote={handleVote}
-            />
-          ))
-        )}
-      </div>
-
-      <p className="text-center text-sm font-medium text-secondary md:text-base">
+    <div className="flex flex-1 flex-col gap-5 md:gap-8">
+      <p className="text-center text-sm font-semibold tracking-wide text-[#4F4D46]/70 md:text-lg">
         Who&apos;s hotter?
       </p>
 
+      <div className="flex flex-1 flex-col items-center gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-stretch md:gap-8">
+        {loading || !matchup ? (
+          <>
+            <PlayerCardSkeleton />
+            <div className="hidden md:block" />
+            <PlayerCardSkeleton />
+          </>
+        ) : (
+          <>
+            <PlayerCard
+              player={matchup.players[0]}
+              disabled={voting}
+              selected={selectedId === matchup.players[0].id}
+              onVote={handleVote}
+            />
+            <div className="flex items-center justify-center md:py-8">
+              <span className="rounded-full border-2 border-[#D4CDB8] bg-[#FAF7F0] px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-[#4F4D46]/60 md:px-5 md:py-2 md:text-sm">
+                vs
+              </span>
+            </div>
+            <PlayerCard
+              player={matchup.players[1]}
+              disabled={voting}
+              selected={selectedId === matchup.players[1].id}
+              onVote={handleVote}
+            />
+          </>
+        )}
+      </div>
+
       {rateLimited && (
-        <div className="fixed inset-x-4 bottom-24 z-30 mx-auto max-w-md">
+        <div className="fixed inset-x-4 bottom-8 z-30 mx-auto max-w-md">
           <AlertFloating
             title="Slow down"
             description="You're voting too quickly. Wait a moment and try again."

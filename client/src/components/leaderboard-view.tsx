@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Avatar } from "@/components/base/avatar/avatar";
 import { BadgeWithDot } from "@/components/base/badges/badges";
 import { LoadingIndicator } from "@/components/application/loading-indicator/loading-indicator";
 import type { LeaderboardEntry, RankingUpdateEvent } from "@/lib/types";
@@ -59,7 +58,7 @@ export function LeaderboardView() {
         <BadgeWithDot color={live ? "success" : "gray"} size="sm" type="pill-color">
           LIVE
         </BadgeWithDot>
-        <p className="text-sm font-medium text-secondary md:text-base">
+        <p className="text-sm font-medium text-[#4F4D46]/70 md:text-base">
           Global Hotness Rankings
         </p>
       </div>
@@ -69,23 +68,25 @@ export function LeaderboardView() {
           <LoadingIndicator type="line-spinner" size="md" label="Loading rankings..." />
         </div>
       ) : (
-        <ol className="divide-y divide-secondary overflow-hidden rounded-2xl border border-secondary bg-primary_alt">
+        <ol className="divide-y divide-[#D4CDB8] overflow-hidden rounded-2xl border-2 border-[#D4CDB8] bg-[#FAF7F0]">
           {rankings.map((entry) => (
             <li
               key={entry.id}
               className={cx(
                 "flex items-center gap-3 px-4 py-3 transition-colors duration-500 md:gap-4 md:px-5 md:py-4",
-                highlightedIds.has(entry.id) && "bg-utility-brand-50",
+                highlightedIds.has(entry.id) && "bg-[#F5E6D3]",
               )}
             >
-              <span className="w-8 shrink-0 text-sm font-semibold text-tertiary md:w-10 md:text-base">
+              <span className="w-8 shrink-0 text-sm font-semibold text-[#4F4D46]/50 md:w-10 md:text-base">
                 #{entry.rank}
               </span>
-              <Avatar src={entry.imageUrl} alt={entry.name} size="md" />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary md:text-base">
+              <div className="player-face-crop size-10 shrink-0 overflow-hidden rounded-full md:size-12">
+                <img src={entry.imageUrl} alt={entry.name} className="player-face-image" />
+              </div>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#4F4D46] md:text-base">
                 {entry.name}
               </span>
-              <span className="shrink-0 text-sm font-semibold text-secondary md:text-base">
+              <span className="shrink-0 text-sm font-semibold text-[#4F4D46]/60 md:text-base">
                 {entry.elo}
               </span>
             </li>

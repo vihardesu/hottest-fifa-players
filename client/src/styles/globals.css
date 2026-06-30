@@ -67,3 +67,51 @@ input[type="search"]::-webkit-search-cancel-button {
 .recharts-surface path {
     outline: none;
 }
+
+/* App color palette */
+:root {
+    --color-bg-primary: rgb(237 232 208);
+    --color-bg-primary_alt: rgb(250 247 240);
+    --color-bg-secondary: rgb(245 240 228);
+    --color-bg-tertiary: rgb(232 226 208);
+    --color-text-primary: rgb(79 77 70);
+    --color-text-secondary: rgb(79 77 70 / 0.75);
+    --color-text-tertiary: rgb(79 77 70 / 0.55);
+    --color-border-secondary: rgb(212 205 184);
+    --color-border-primary: rgb(196 188 168);
+}
+
+/* Face crop — zoom into top third of player images */
+.player-face-crop {
+    overflow: hidden;
+}
+
+.player-face-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 8%;
+    transform: scale(2.4);
+    transform-origin: center 12%;
+}
+
+/* Heart burst animation */
+@keyframes heart-burst {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2) rotate(var(--rotation));
+    }
+    15% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1) rotate(var(--rotation));
+    }
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.6)
+            rotate(calc(var(--rotation) + 20deg));
+    }
+}
+
+.heart-particle {
+    animation: heart-burst 0.9s cubic-bezier(0.22, 1, 0.36, 1) var(--delay) forwards;
+}

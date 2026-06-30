@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full scroll-smooth`}>
-      <body className="min-h-full bg-primary text-primary antialiased">
+      <body className="min-h-full bg-[#EDE8D0] text-[#4F4D46] antialiased">
         <AppShell>{children}</AppShell>
       </body>
     </html>
