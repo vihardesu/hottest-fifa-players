@@ -3,6 +3,9 @@ export interface PlayerRecord {
   player_name: string;
   short_name: string;
   country: string;
+  country_code: string | null;
+  birth_date: string | null;
+  height_cm: number | null;
   image_url: string;
 }
 
@@ -16,6 +19,9 @@ export interface MatchupPlayer {
   name: string;
   imageUrl: string;
   country: string;
+  countryCode: string | null;
+  birthDate: string | null;
+  heightCm: number | null;
   elo: number;
 }
 
@@ -29,6 +35,10 @@ export interface LeaderboardEntry {
   rank: number;
   name: string;
   imageUrl: string;
+  country: string;
+  countryCode: string | null;
+  birthDate: string | null;
+  heightCm: number | null;
   elo: number;
 }
 

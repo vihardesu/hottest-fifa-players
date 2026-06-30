@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertFloating } from "@/components/application/alerts/alerts";
 import { PlayerCard, PlayerCardSkeleton } from "@/components/player-card";
 import type { MatchupResponse } from "@/lib/types";
+import { preloadImage } from "@/lib/ui-utils";
+import { cx } from "@/utils/cx";
 
 async function fetchMatchup(): Promise<MatchupResponse> {
   const response = await fetch("/api/matchup");
@@ -19,12 +21,16 @@ export function MatchupView() {
   const [voting, setVoting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rateLimited, setRateLimited] = useState(false);
+  const [cardsVisible, setCardsVisible] = useState(true);
 
   const loadMatchup = useCallback(async () => {
     setLoading(true);
+    setCardsVisible(false);
     try {
       const data = await fetchMatchup();
+      await Promise.all(data.players.map((player) => preloadImage(player.imageUrl)));
       setMatchup(data);
+      requestAnimationFrame(() => setCardsVisible(true));
     } finally {
       setLoading(false);
     }
@@ -65,11 +71,25 @@ export function MatchupView() {
       }
 
       const data = await response.json();
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      setMatchup(data.nextMatchup);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      setCardsVisible(false);
+
+      await new Promise((resolve) => setTimeout(resolve, 220));
+
+      if (data.nextMatchup) {
+        await Promise.all(
+          data.nextMatchup.players.map((player: { imageUrl: string }) =>
+            preloadImage(player.imageUrl),
+          ),
+        );
+        setMatchup(data.nextMatchup);
+      }
+
       setSelectedId(null);
+      requestAnimationFrame(() => setCardsVisible(true));
     } catch {
       setSelectedId(null);
+      setCardsVisible(true);
     } finally {
       setVoting(false);
     }
@@ -87,15 +107,21 @@ export function MatchupView() {
         </span>
       </h2>
 
-      <div className="flex flex-1 flex-col items-center gap-4 overflow-visible py-6 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-8 md:py-8">
+      <div className="flex w-full flex-1 flex-col items-center overflow-visible py-6 md:py-8">
         {loading || !matchup ? (
-          <>
+          <div className="grid w-full grid-cols-1 items-center gap-4 md:grid-cols-[1fr_auto_1fr] md:gap-8">
             <PlayerCardSkeleton />
             <div className="hidden md:block" />
             <PlayerCardSkeleton />
-          </>
+          </div>
         ) : (
-          <>
+          <div
+            key={matchup.matchupId}
+            className={cx(
+              "grid w-full grid-cols-1 items-center gap-4 transition-opacity duration-300 ease-out md:grid-cols-[1fr_auto_1fr] md:gap-8",
+              cardsVisible ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
             <PlayerCard
               player={matchup.players[0]}
               disabled={voting}
@@ -113,7 +139,7 @@ export function MatchupView() {
               selected={selectedId === matchup.players[1].id}
               onVote={handleVote}
             />
-          </>
+          </div>
         )}
       </div>
 

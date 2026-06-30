@@ -112,6 +112,9 @@ function toMatchupPlayer(player: PlayerState): MatchupPlayer {
     name: formatPlayerName(player.player_name),
     imageUrl: player.image_url,
     country: player.country,
+    countryCode: player.country_code,
+    birthDate: player.birth_date,
+    heightCm: player.height_cm,
     elo: displayRating(player.rating),
   };
 }
@@ -135,6 +138,10 @@ function getLeaderboardFromCache(limit = LEADERBOARD_LIMIT): LeaderboardEntry[] 
     rank: player.rank,
     name: formatPlayerName(player.player_name),
     imageUrl: player.image_url,
+    country: player.country,
+    countryCode: player.country_code,
+    birthDate: player.birth_date,
+    heightCm: player.height_cm,
     elo: displayRating(player.rating),
   }));
 }
@@ -195,7 +202,9 @@ async function loadFromDatabase(): Promise<void> {
   const supabase = createAdminClient();
   const { data: playerRows, error: playersError } = await supabase
     .from("players")
-    .select("player_id, player_name, short_name, country, image_url, rating, rd, volatility");
+    .select(
+      "player_id, player_name, short_name, country, country_code, birth_date, height_cm, image_url, rating, rd, volatility",
+    );
 
   if (playersError) {
     throw new Error(`Failed to load players: ${playersError.message}`);
@@ -213,6 +222,9 @@ async function loadFromDatabase(): Promise<void> {
         player_name: row.player_name,
         short_name: row.short_name ?? row.player_name,
         country: row.country,
+        country_code: row.country_code ?? null,
+        birth_date: row.birth_date ?? null,
+        height_cm: row.height_cm ?? null,
         image_url: row.image_url,
         rating: row.rating ?? GLICKO_DEFAULTS.rating,
         rd: row.rd ?? GLICKO_DEFAULTS.rd,

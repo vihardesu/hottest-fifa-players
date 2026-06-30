@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Trophy01 } from "@untitledui/icons";
+import { ThumbsUp, Trophy01 } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
 
 interface AppShellProps {
@@ -22,7 +22,13 @@ export function AppShell({ children }: AppShellProps) {
             FIFA Face-Off
           </h1>
           {isLeaderboard ? (
-            <Button href="/" color="secondary" size="md" className="border-[#D4CDB8] bg-[#FAF7F0] text-[#4F4D46] shadow-md">
+            <Button
+              href="/"
+              color="secondary"
+              size="md"
+              iconLeading={ThumbsUp}
+              className="border-[#D4CDB8] bg-[#FAF7F0] px-5 text-[#4F4D46] shadow-md"
+            >
               Vote
             </Button>
           ) : isVotingPage ? (
@@ -45,6 +51,13 @@ export function AppShell({ children }: AppShellProps) {
 
       <footer className="bg-[#EDE8D0]">
         <div className="flex items-center justify-end gap-2 px-3 py-4 text-xs text-[#4F4D46]/50 md:gap-3 md:px-4">
+          <Link
+            href="/methodology"
+            className="underline-offset-2 transition hover:text-[#4F4D46]/75 hover:underline"
+          >
+            Methodology
+          </Link>
+          <span aria-hidden="true">·</span>
           <Link
             href="/terms"
             className="underline-offset-2 transition hover:text-[#4F4D46]/75 hover:underline"

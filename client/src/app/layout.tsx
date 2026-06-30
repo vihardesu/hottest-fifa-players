@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Inter } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
+import { getSiteUrl } from "@/lib/site-url";
 import "@/styles/globals.css";
 
 const inter = Inter({
@@ -15,9 +16,27 @@ const fredoka = Fredoka({
   display: "swap",
 });
 
+const title = "FIFA Face-Off";
+const description =
+  "Vote on the hottest FIFA 2026 players in head-to-head matchups. Pick your favorite face and climb the live leaderboard.";
+
 export const metadata: Metadata = {
-  title: "FIFA Face-Off",
-  description: "Vote on the hottest FIFA 2026 players in head-to-head matchups.",
+  metadataBase: new URL(getSiteUrl()),
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    url: "/",
+    siteName: title,
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export const viewport = {

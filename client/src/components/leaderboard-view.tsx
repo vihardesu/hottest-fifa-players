@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { BadgeWithDot } from "@/components/base/badges/badges";
 import { LoadingIndicator } from "@/components/application/loading-indicator/loading-indicator";
+import { PlayerCardModal } from "@/components/player-card-modal";
 import type { LeaderboardEntry, RankingUpdateEvent } from "@/lib/types";
+import { formatLastUpdated } from "@/lib/ui-utils";
 import { cx } from "@/utils/cx";
 
 export function LeaderboardView() {
@@ -11,6 +13,8 @@ export function LeaderboardView() {
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
+  const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const previousElos = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -53,6 +57,7 @@ export function LeaderboardView() {
       });
 
       setRankings(nextRankings);
+      setLastUpdated(new Date());
       setLoading(false);
     };
 
@@ -64,13 +69,20 @@ export function LeaderboardView() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <BadgeWithDot color={live ? "success" : "gray"} size="sm" type="pill-color">
-          LIVE
-        </BadgeWithDot>
-        <p className="text-sm font-medium text-[#4F4D46]/70 md:text-base">
-          Global Hotness Rankings
-        </p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1">
+        <div className="flex items-center gap-3">
+          <BadgeWithDot color={live ? "success" : "gray"} size="sm" type="pill-color">
+            LIVE
+          </BadgeWithDot>
+          <p className="text-sm font-medium text-[#4F4D46]/70 md:text-base">
+            Global Hotness Rankings
+          </p>
+        </div>
+        {lastUpdated && (
+          <p className="text-xs text-[#4F4D46]/45 sm:border-l sm:border-[#D4CDB8]/60 sm:pl-3">
+            Last updated {formatLastUpdated(lastUpdated)}
+          </p>
+        )}
       </div>
 
       {loading ? (
@@ -80,29 +92,35 @@ export function LeaderboardView() {
       ) : (
         <ol className="divide-y divide-[#D4CDB8] overflow-hidden rounded-2xl border-2 border-[#D4CDB8] bg-[#FAF7F0]">
           {rankings.map((entry) => (
-            <li
-              key={entry.id}
-              className={cx(
-                "flex items-center gap-3 px-4 py-3 transition-colors duration-500 md:gap-4 md:px-5 md:py-4",
-                highlightedIds.has(entry.id) && "bg-[#F5E6D3]",
-              )}
-            >
-              <span className="w-8 shrink-0 text-sm font-semibold text-[#4F4D46]/50 md:w-10 md:text-base">
-                #{entry.rank}
-              </span>
-              <div className="player-face-crop player-face-crop--round size-10 shrink-0 md:size-12">
-                <img src={entry.imageUrl} alt={entry.name} className="player-face-image" />
-              </div>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#4F4D46] md:text-base">
-                {entry.name}
-              </span>
-              <span className="shrink-0 text-sm font-semibold text-[#4F4D46]/60 md:text-base">
-                {entry.elo}
-              </span>
+            <li key={entry.id}>
+              <button
+                type="button"
+                onClick={() => setSelectedEntry(entry)}
+                className={cx(
+                  "flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors duration-500 md:gap-4 md:px-5 md:py-4",
+                  "hover:bg-[#F5F0E4] focus-visible:bg-[#F5F0E4] focus-visible:outline-none",
+                  highlightedIds.has(entry.id) && "bg-[#F5E6D3]",
+                )}
+              >
+                <span className="w-8 shrink-0 text-sm font-semibold text-[#4F4D46]/50 md:w-10 md:text-base">
+                  #{entry.rank}
+                </span>
+                <div className="player-face-crop player-face-crop--round size-10 shrink-0 md:size-12">
+                  <img src={entry.imageUrl} alt={entry.name} className="player-face-image" />
+                </div>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#4F4D46] md:text-base">
+                  {entry.name}
+                </span>
+                <span className="shrink-0 text-sm font-semibold text-[#4F4D46]/60 md:text-base">
+                  {entry.elo}
+                </span>
+              </button>
             </li>
           ))}
         </ol>
       )}
+
+      <PlayerCardModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
     </div>
   );
 }
