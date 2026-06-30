@@ -7,7 +7,7 @@ export interface PlayerRecord {
 }
 
 export interface RatedPlayer extends PlayerRecord {
-  elo: number;
+  rating: number;
   rank: number;
 }
 
@@ -32,10 +32,20 @@ export interface LeaderboardEntry {
   elo: number;
 }
 
+export interface VoteRecord {
+  id: string;
+  winnerId: string;
+  loserId: string;
+  sessionId: string;
+  timestamp: number;
+  processed: boolean;
+}
+
 export interface VoteResponse {
   success: boolean;
   nextMatchup?: MatchupResponse;
   rateLimited?: boolean;
+  message?: string;
 }
 
 export interface RankingUpdateEvent {

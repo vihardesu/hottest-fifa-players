@@ -11,11 +11,18 @@ export async function GET(request: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
       };
 
-      send({ type: "initial", rankings: getLeaderboard() });
-
       const unsubscribe = subscribeToRankings((rankings) => {
         send({ type: "ranking_update", rankings });
       });
+
+      void getLeaderboard()
+        .then((rankings) => {
+          send({ type: "initial", rankings });
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : "Failed to load leaderboard";
+          send({ type: "error", message });
+        });
 
       const heartbeat = setInterval(() => {
         controller.enqueue(encoder.encode(": heartbeat\n\n"));

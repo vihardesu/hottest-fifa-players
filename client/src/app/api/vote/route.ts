@@ -17,18 +17,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Missing player ids" }, { status: 400 });
   }
 
-  const result = submitVote(winnerId, loserId, getClientId(request));
+  const result = await submitVote(winnerId, loserId, getClientId(request));
 
   if (result.rateLimited) {
-    return NextResponse.json({ success: false, rateLimited: true }, { status: 429 });
+    return NextResponse.json(
+      { success: false, rateLimited: true, message: result.message },
+      { status: 429 },
+    );
   }
 
   if (!result.success) {
-    return NextResponse.json({ success: false }, { status: 400 });
+    return NextResponse.json(
+      { success: false, message: result.message },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({
     success: true,
-    nextMatchup: getMatchup(),
+    nextMatchup: await getMatchup(),
   });
 }
