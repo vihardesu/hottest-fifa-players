@@ -1,4 +1,5 @@
 import type {
+  CountryLeaderboardEntry,
   LeaderboardEntry,
   MatchupPlayer,
   MatchupResponse,
@@ -7,6 +8,7 @@ import type {
   VoteRecord,
 } from "@/lib/types";
 import {
+  COUNTRY_LEADERBOARD_LIMIT,
   LEADERBOARD_LIMIT,
   MATCHUP_RATING_WINDOW,
   DUPLICATE_VOTE_WINDOW_MS,
@@ -36,6 +38,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type RankingListener = (rankings: LeaderboardEntry[]) => void;
+type CountryRankingListener = (rankings: CountryLeaderboardEntry[]) => void;
 
 interface PlayerState extends PlayerRecord {
   rating: number;
@@ -54,7 +57,9 @@ interface SessionVoteState {
 }
 
 const listeners = new Set<RankingListener>();
+const countryListeners = new Set<CountryRankingListener>();
 const voteTimestamps = new Map<string, number>();
+const voteInFlight = new Set<string>();
 const sessionState = new Map<string, SessionVoteState>();
 
 let initialized = false;
@@ -187,9 +192,68 @@ function getLeaderboardFromCache(limit = LEADERBOARD_LIMIT): LeaderboardEntry[] 
   }));
 }
 
+function getCountryLeaderboardFromCache(
+  limit = COUNTRY_LEADERBOARD_LIMIT,
+): CountryLeaderboardEntry[] {
+  const byCountry = new Map<string, PlayerState[]>();
+
+  for (const player of players.values()) {
+    if (!player.country_code) {
+      continue;
+    }
+
+    const code = player.country_code.toUpperCase();
+    const squad = byCountry.get(code) ?? [];
+    squad.push(player);
+    byCountry.set(code, squad);
+  }
+
+  return [...byCountry.entries()]
+    .map(([code, squad]) => {
+      const avgRating = squad.reduce((sum, player) => sum + player.rating, 0) / squad.length;
+      const topPlayer = squad.reduce((best, player) =>
+        player.rating > best.rating ? player : best,
+      );
+
+      return {
+        id: code,
+        country: squad[0].country,
+        countryCode: code,
+        squadScore: displayRating(avgRating),
+        rawScore: avgRating,
+        playerCount: squad.length,
+        topPlayer: {
+          id: topPlayer.player_id,
+          name: formatPlayerName(topPlayer.player_name),
+          imageUrl: topPlayer.image_url,
+          elo: displayRating(topPlayer.rating),
+        },
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.rawScore - a.rawScore ||
+        b.topPlayer.elo - a.topPlayer.elo ||
+        a.country.localeCompare(b.country),
+    )
+    .slice(0, limit)
+    .map((entry, index) => ({
+      id: entry.id,
+      rank: index + 1,
+      country: entry.country,
+      countryCode: entry.countryCode,
+      squadScore: entry.squadScore,
+      playerCount: entry.playerCount,
+      topPlayer: entry.topPlayer,
+    }));
+}
+
 function notifyListeners(): void {
   const rankings = getLeaderboardFromCache();
   listeners.forEach((listener) => listener(rankings));
+
+  const countryRankings = getCountryLeaderboardFromCache();
+  countryListeners.forEach((listener) => listener(countryRankings));
 }
 
 async function persistPlayerRatings(updates: Map<string, GlickoPlayerState>): Promise<void> {
@@ -363,6 +427,11 @@ export function subscribeToRankings(listener: RankingListener): () => void {
   return () => listeners.delete(listener);
 }
 
+export function subscribeToCountryRankings(listener: CountryRankingListener): () => void {
+  countryListeners.add(listener);
+  return () => countryListeners.delete(listener);
+}
+
 export async function getMatchup(): Promise<MatchupResponse> {
   await ensurePlayersLoaded();
 
@@ -392,78 +461,88 @@ export async function submitVote(
   loserId: string,
   sessionId: string,
 ): Promise<{ success: boolean; rateLimited?: boolean; message?: string; periodDue?: boolean }> {
-  await ensurePlayersLoaded();
-
   const now = Date.now();
   const lastVote = voteTimestamps.get(sessionId) ?? 0;
   if (now - lastVote < RATE_LIMIT_MS) {
     return { success: false, rateLimited: true, message: "Voting too quickly." };
   }
 
-  const winner = players.get(winnerId);
-  const loser = players.get(loserId);
-
-  if (!winner || !loser || winnerId === loserId) {
-    return { success: false, message: "Invalid matchup." };
+  if (voteInFlight.has(sessionId)) {
+    return { success: false, rateLimited: true, message: "Voting too quickly." };
   }
 
-  const session = getSessionState(sessionId);
+  voteInFlight.add(sessionId);
 
-  if (
-    session.lastWinnerId === winnerId &&
-    session.lastLoserId === loserId &&
-    now - session.lastVoteAt < DUPLICATE_VOTE_WINDOW_MS
-  ) {
-    return { success: false, rateLimited: true, message: "Duplicate vote ignored." };
+  try {
+    await ensurePlayersLoaded();
+
+    const winner = players.get(winnerId);
+    const loser = players.get(loserId);
+
+    if (!winner || !loser || winnerId === loserId) {
+      return { success: false, message: "Invalid matchup." };
+    }
+
+    const session = getSessionState(sessionId);
+
+    if (
+      session.lastWinnerId === winnerId &&
+      session.lastLoserId === loserId &&
+      now - session.lastVoteAt < DUPLICATE_VOTE_WINDOW_MS
+    ) {
+      return { success: true, periodDue: false };
+    }
+
+    const day = todayKey();
+    const persistedSessionVotes = await getSessionVotesCached(sessionId, day);
+
+    if (persistedSessionVotes.length >= MAX_VOTES_PER_SESSION_PER_DAY) {
+      return {
+        success: false,
+        rateLimited: true,
+        message: "Daily vote limit reached for this session.",
+      };
+    }
+
+    const votesForWinner = persistedSessionVotes.filter(
+      (vote) => vote.winnerId === winnerId || vote.loserId === winnerId,
+    ).length;
+    const votesForLoser = persistedSessionVotes.filter(
+      (vote) => vote.winnerId === loserId || vote.loserId === loserId,
+    ).length;
+
+    if (
+      votesForWinner >= MAX_VOTES_PER_PLAYER_PER_SESSION_PER_DAY ||
+      votesForLoser >= MAX_VOTES_PER_PLAYER_PER_SESSION_PER_DAY
+    ) {
+      return {
+        success: false,
+        rateLimited: true,
+        message: "Too many votes affecting these players today.",
+      };
+    }
+
+    const period = await ensureActiveRatingPeriod();
+
+    const voteRecord = await appendVote(
+      winnerId,
+      loserId,
+      sessionId,
+      period.id,
+      hashClientId(sessionId),
+    );
+
+    appendSessionVoteCache(sessionId, day, voteRecord);
+
+    session.lastVoteAt = now;
+    session.lastWinnerId = winnerId;
+    session.lastLoserId = loserId;
+    voteTimestamps.set(sessionId, now);
+
+    return { success: true, periodDue: isRatingPeriodDue(period) };
+  } finally {
+    voteInFlight.delete(sessionId);
   }
-
-  const day = todayKey();
-  const persistedSessionVotes = await getSessionVotesCached(sessionId, day);
-
-  if (persistedSessionVotes.length >= MAX_VOTES_PER_SESSION_PER_DAY) {
-    return {
-      success: false,
-      rateLimited: true,
-      message: "Daily vote limit reached for this session.",
-    };
-  }
-
-  const votesForWinner = persistedSessionVotes.filter(
-    (vote) => vote.winnerId === winnerId || vote.loserId === winnerId,
-  ).length;
-  const votesForLoser = persistedSessionVotes.filter(
-    (vote) => vote.winnerId === loserId || vote.loserId === loserId,
-  ).length;
-
-  if (
-    votesForWinner >= MAX_VOTES_PER_PLAYER_PER_SESSION_PER_DAY ||
-    votesForLoser >= MAX_VOTES_PER_PLAYER_PER_SESSION_PER_DAY
-  ) {
-    return {
-      success: false,
-      rateLimited: true,
-      message: "Too many votes affecting these players today.",
-    };
-  }
-
-  const period = await ensureActiveRatingPeriod();
-
-  const voteRecord = await appendVote(
-    winnerId,
-    loserId,
-    sessionId,
-    period.id,
-    hashClientId(sessionId),
-  );
-
-  appendSessionVoteCache(sessionId, day, voteRecord);
-
-  session.lastVoteAt = now;
-  session.lastWinnerId = winnerId;
-  session.lastLoserId = loserId;
-  voteTimestamps.set(sessionId, now);
-
-  return { success: true, periodDue: isRatingPeriodDue(period) };
 }
 
 export async function getLeaderboard(limit = LEADERBOARD_LIMIT): Promise<LeaderboardEntry[]> {
@@ -471,4 +550,13 @@ export async function getLeaderboard(limit = LEADERBOARD_LIMIT): Promise<Leaderb
   await maybeRunRatingPeriod();
   await reloadRatingsFromDatabase();
   return getLeaderboardFromCache(limit);
+}
+
+export async function getCountryLeaderboard(
+  limit = COUNTRY_LEADERBOARD_LIMIT,
+): Promise<CountryLeaderboardEntry[]> {
+  await ensurePlayersLoaded();
+  await maybeRunRatingPeriod();
+  await reloadRatingsFromDatabase();
+  return getCountryLeaderboardFromCache(limit);
 }

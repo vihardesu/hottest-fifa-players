@@ -11,20 +11,20 @@ export function CountryFlag({ country, countryCode, className }: CountryFlagProp
   const flagUrl = getFlagUrl(countryCode);
 
   return (
-    <span className={`inline-flex items-center gap-2 text-inherit ${className ?? ""}`}>
+    <span className={`inline-flex max-w-full items-center gap-1 text-inherit md:gap-2 ${className ?? ""}`}>
       {flagUrl ? (
         <Image
           src={flagUrl}
           alt=""
           width={28}
           height={21}
-          className="h-4 w-[22px] shrink-0 rounded-[2px] object-cover shadow-sm ring-1 ring-[#D4CDB8]/80 md:h-5 md:w-7"
+          className="h-3 w-4 shrink-0 rounded-[2px] object-cover shadow-sm ring-1 ring-[#D4CDB8]/80 md:h-5 md:w-7"
           aria-hidden
         />
       ) : (
-        <span className="size-4 shrink-0 rounded-full bg-[#D4CDB8]/60 md:size-5" aria-hidden />
+        <span className="size-3 shrink-0 rounded-full bg-[#D4CDB8]/60 md:size-5" aria-hidden />
       )}
-      <span>{country}</span>
+      <span className="truncate">{country}</span>
     </span>
   );
 }

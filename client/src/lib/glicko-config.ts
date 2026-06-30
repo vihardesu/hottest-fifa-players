@@ -14,9 +14,11 @@ export const RATING_PERIOD_MS =
   Number(process.env.RATING_PERIOD_MS) || 5 * 60 * 1000;
 
 export const LEADERBOARD_LIMIT = 50;
+export const COUNTRY_LEADERBOARD_LIMIT = 50;
 
 /** Guardrails */
-export const RATE_LIMIT_MS = 1000;
+/** Debounce double-submits; duplicate-vote and daily caps handle abuse. */
+export const RATE_LIMIT_MS = 150;
 export const DUPLICATE_VOTE_WINDOW_MS = 2000;
 export const MAX_VOTES_PER_SESSION_PER_DAY = 100;
 export const MAX_VOTES_PER_PLAYER_PER_SESSION_PER_DAY = 15;

@@ -2,7 +2,12 @@ import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { getMatchup, maybeRunRatingPeriod, submitVote } from "@/lib/players";
 
-function getClientId(request: Request): string {
+function getSessionId(request: Request): string {
+  const fromClient = request.headers.get("x-session-id")?.trim();
+  if (fromClient && fromClient.length <= 64 && /^[\w-]+$/.test(fromClient)) {
+    return fromClient;
+  }
+
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
@@ -18,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Missing player ids" }, { status: 400 });
   }
 
-  const result = await submitVote(winnerId, loserId, getClientId(request));
+  const result = await submitVote(winnerId, loserId, getSessionId(request));
 
   if (result.rateLimited) {
     return NextResponse.json(

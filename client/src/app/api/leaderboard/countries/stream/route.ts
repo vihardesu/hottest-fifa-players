@@ -1,4 +1,8 @@
-import { getLeaderboard, maybeRunRatingPeriod, subscribeToRankings } from "@/lib/players";
+import {
+  getCountryLeaderboard,
+  maybeRunRatingPeriod,
+  subscribeToCountryRankings,
+} from "@/lib/players";
 
 export const dynamic = "force-dynamic";
 
@@ -42,19 +46,19 @@ export async function GET(request: Request) {
       };
 
       const pushRankings = async (type: "initial" | "ranking_update") => {
-        const rankings = await getLeaderboard();
+        const rankings = await getCountryLeaderboard();
         if (closed) {
           return;
         }
         send({ type, rankings });
       };
 
-      const unsubscribe = subscribeToRankings((rankings) => {
+      const unsubscribe = subscribeToCountryRankings((rankings) => {
         send({ type: "ranking_update", rankings });
       });
 
       void pushRankings("initial").catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : "Failed to load leaderboard";
+        const message = error instanceof Error ? error.message : "Failed to load country leaderboard";
         send({ type: "error", message });
       });
 
@@ -64,7 +68,8 @@ export async function GET(request: Request) {
             await maybeRunRatingPeriod();
             await pushRankings("ranking_update");
           } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : "Failed to refresh leaderboard";
+            const message =
+              error instanceof Error ? error.message : "Failed to refresh country leaderboard";
             send({ type: "error", message });
           }
         })();

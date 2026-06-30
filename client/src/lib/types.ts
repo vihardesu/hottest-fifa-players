@@ -42,6 +42,27 @@ export interface LeaderboardEntry {
   elo: number;
 }
 
+export interface CountryLeaderboardEntry {
+  id: string;
+  rank: number;
+  country: string;
+  countryCode: string;
+  squadScore: number;
+  playerCount: number;
+  topPlayer: {
+    id: string;
+    name: string;
+    imageUrl: string;
+    elo: number;
+  };
+}
+
+export interface CountryRankingUpdateEvent {
+  type: "initial" | "ranking_update" | "error";
+  rankings?: CountryLeaderboardEntry[];
+  message?: string;
+}
+
 export interface VoteRecord {
   id: string;
   winnerId: string;

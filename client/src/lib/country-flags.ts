@@ -50,7 +50,10 @@ const FIFA_FLAG_SLUG: Record<string, string> = {
   UZB: "uz",
 };
 
-export function getFlagUrl(countryCode: string | null | undefined): string | null {
+export function getFlagUrl(
+  countryCode: string | null | undefined,
+  width = 24,
+): string | null {
   if (!countryCode) {
     return null;
   }
@@ -60,5 +63,7 @@ export function getFlagUrl(countryCode: string | null | undefined): string | nul
     return null;
   }
 
-  return `https://flagcdn.com/24x18/${slug}.png`;
+  // flagcdn rejects some `w{width}` values (e.g. w24 → 404); WxH is reliable.
+  const height = Math.round((width * 18) / 24);
+  return `https://flagcdn.com/${width}x${height}/${slug}.png`;
 }
