@@ -161,6 +161,36 @@ async function persistPlayerRatings(updates: Map<string, GlickoPlayerState>): Pr
   );
 }
 
+async function reloadRatingsFromDatabase(): Promise<void> {
+  if (players.size === 0) {
+    return;
+  }
+
+  const supabase = createAdminClient();
+  const { data: rows, error } = await supabase
+    .from("players")
+    .select("player_id, rating, rd, volatility");
+
+  if (error) {
+    throw new Error(`Failed to reload player ratings: ${error.message}`);
+  }
+
+  for (const row of rows ?? []) {
+    const id = String(row.player_id);
+    const player = players.get(id);
+    if (!player) {
+      continue;
+    }
+
+    players.set(id, {
+      ...player,
+      rating: row.rating ?? GLICKO_DEFAULTS.rating,
+      rd: row.rd ?? GLICKO_DEFAULTS.rd,
+      vol: row.volatility ?? GLICKO_DEFAULTS.vol,
+    });
+  }
+}
+
 async function loadFromDatabase(): Promise<void> {
   const supabase = createAdminClient();
   const { data: playerRows, error: playersError } = await supabase
@@ -206,6 +236,7 @@ export async function ensurePlayersLoaded(): Promise<void> {
 
 export async function maybeRunRatingPeriod(): Promise<boolean> {
   await ensurePlayersLoaded();
+  await reloadRatingsFromDatabase();
 
   const period = await getActiveRatingPeriod();
   activeRatingPeriodId = period.id;
@@ -384,5 +415,6 @@ export async function submitVote(
 export async function getLeaderboard(limit = LEADERBOARD_LIMIT): Promise<LeaderboardEntry[]> {
   await ensurePlayersLoaded();
   await maybeRunRatingPeriod();
+  await reloadRatingsFromDatabase();
   return getLeaderboardFromCache(limit);
 }

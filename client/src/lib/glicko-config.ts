@@ -9,9 +9,9 @@ export const GLICKO_DEFAULTS = {
 /** Pair players within ~150–200 rating points of each other. */
 export const MATCHUP_RATING_WINDOW = 175;
 
-/** Batch rating updates every few hours (override via RATING_PERIOD_MS). */
+/** Batch rating updates every 5 minutes (override via RATING_PERIOD_MS). */
 export const RATING_PERIOD_MS =
-  Number(process.env.RATING_PERIOD_MS) || 3 * 60 * 60 * 1000;
+  Number(process.env.RATING_PERIOD_MS) || 5 * 60 * 1000;
 
 export const LEADERBOARD_LIMIT = 50;
 

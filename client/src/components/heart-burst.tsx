@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { playTwinkleSound } from "@/lib/play-twinkle-sound";
 
 interface Particle {
   id: number;
@@ -15,7 +16,7 @@ interface Particle {
 
 function createParticles(): Particle[] {
   const particles: Particle[] = [];
-  const count = 16;
+  const count = 18;
 
   for (let i = 0; i < count; i++) {
     const edge = i % 4;
@@ -29,23 +30,23 @@ function createParticles(): Particle[] {
     if (edge === 0) {
       x = t * 100;
       y = 0;
-      dx = (Math.random() - 0.5) * 60;
-      dy = -(40 + Math.random() * 50);
+      dx = (Math.random() - 0.5) * 70;
+      dy = -(50 + Math.random() * 60);
     } else if (edge === 1) {
       x = 100;
       y = t * 100;
-      dx = 40 + Math.random() * 50;
-      dy = (Math.random() - 0.5) * 60;
+      dx = 50 + Math.random() * 60;
+      dy = (Math.random() - 0.5) * 70;
     } else if (edge === 2) {
       x = t * 100;
       y = 100;
-      dx = (Math.random() - 0.5) * 60;
-      dy = 40 + Math.random() * 50;
+      dx = (Math.random() - 0.5) * 70;
+      dy = 50 + Math.random() * 60;
     } else {
       x = 0;
       y = t * 100;
-      dx = -(40 + Math.random() * 50);
-      dy = (Math.random() - 0.5) * 60;
+      dx = -(50 + Math.random() * 60);
+      dy = (Math.random() - 0.5) * 70;
     }
 
     particles.push({
@@ -55,7 +56,7 @@ function createParticles(): Particle[] {
       dx,
       dy,
       delay: Math.random() * 0.15,
-      size: 10 + Math.random() * 10,
+      size: 12 + Math.random() * 12,
       rotation: Math.random() * 40 - 20,
     });
   }
@@ -73,6 +74,7 @@ export function HeartBurst({ active }: HeartBurstProps) {
   useEffect(() => {
     if (active) {
       setParticles(createParticles());
+      playTwinkleSound();
     }
   }, [active]);
 
@@ -81,7 +83,7 @@ export function HeartBurst({ active }: HeartBurstProps) {
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 overflow-visible" aria-hidden>
+    <div className="pointer-events-none absolute inset-0 z-50 overflow-visible" aria-hidden>
       {particles.map((particle) => (
         <span
           key={particle.id}

@@ -21,7 +21,17 @@ export function LeaderboardView() {
 
     source.onmessage = (event) => {
       const payload = JSON.parse(event.data) as RankingUpdateEvent;
+
+      if (payload.type === "error") {
+        setLive(false);
+        setLoading(false);
+        return;
+      }
+
       const nextRankings = payload.rankings;
+      if (!nextRankings) {
+        return;
+      }
 
       if (payload.type === "ranking_update") {
         const changed = new Set<string>();
@@ -80,7 +90,7 @@ export function LeaderboardView() {
               <span className="w-8 shrink-0 text-sm font-semibold text-[#4F4D46]/50 md:w-10 md:text-base">
                 #{entry.rank}
               </span>
-              <div className="player-face-crop size-10 shrink-0 overflow-hidden rounded-full md:size-12">
+              <div className="player-face-crop player-face-crop--round size-10 shrink-0 md:size-12">
                 <img src={entry.imageUrl} alt={entry.name} className="player-face-image" />
               </div>
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#4F4D46] md:text-base">

@@ -77,11 +77,17 @@ export function MatchupView() {
 
   return (
     <div className="flex flex-1 flex-col gap-5 md:gap-8">
-      <p className="text-center text-sm font-semibold tracking-wide text-[#4F4D46]/70 md:text-lg">
+      <h2 className="flex items-center justify-center gap-2.5 text-center text-2xl font-bold text-[#4F4D46] md:gap-3 md:text-4xl">
+        <span className="text-[1.1em] leading-none" aria-hidden="true">
+          🔥
+        </span>
         Who&apos;s hotter?
-      </p>
+        <span className="text-[1.1em] leading-none" aria-hidden="true">
+          😍
+        </span>
+      </h2>
 
-      <div className="flex flex-1 flex-col items-center gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-stretch md:gap-8">
+      <div className="flex flex-1 flex-col items-center gap-4 overflow-visible py-6 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-8 md:py-8">
         {loading || !matchup ? (
           <>
             <PlayerCardSkeleton />

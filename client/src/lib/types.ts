@@ -49,6 +49,7 @@ export interface VoteResponse {
 }
 
 export interface RankingUpdateEvent {
-  type: "initial" | "ranking_update";
-  rankings: LeaderboardEntry[];
+  type: "initial" | "ranking_update" | "error";
+  rankings?: LeaderboardEntry[];
+  message?: string;
 }
