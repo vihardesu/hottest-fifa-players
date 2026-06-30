@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertFloating } from "@/components/application/alerts/alerts";
 import { PlayerCard, PlayerCardSkeleton } from "@/components/player-card";
-import type { MatchupResponse } from "@/lib/types";
-import { preloadImage } from "@/lib/ui-utils";
+import { VoteConfetti } from "@/components/vote-confetti";
+import {
+  fetchMatchupFromApi,
+  MatchupPrefetcher,
+  warmMatchupImages,
+} from "@/lib/matchup-prefetch";
+import type { MatchupResponse, VoteResponse } from "@/lib/types";
 import { cx } from "@/utils/cx";
 
-async function fetchMatchup(): Promise<MatchupResponse> {
-  const response = await fetch("/api/matchup");
-  if (!response.ok) {
-    throw new Error("Failed to load matchup");
-  }
-  return response.json();
-}
+const FADE_MS = 150;
 
 export function MatchupView() {
   const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
@@ -22,14 +21,17 @@ export function MatchupView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rateLimited, setRateLimited] = useState(false);
   const [cardsVisible, setCardsVisible] = useState(true);
+  const [confettiBurst, setConfettiBurst] = useState(0);
+  const prefetcher = useRef(new MatchupPrefetcher());
 
   const loadMatchup = useCallback(async () => {
     setLoading(true);
     setCardsVisible(false);
     try {
-      const data = await fetchMatchup();
-      await Promise.all(data.players.map((player) => preloadImage(player.imageUrl)));
+      const data = await fetchMatchupFromApi();
+      await warmMatchupImages(data);
       setMatchup(data);
+      prefetcher.current.schedule(data.matchupId);
       requestAnimationFrame(() => setCardsVisible(true));
     } finally {
       setLoading(false);
@@ -40,63 +42,104 @@ export function MatchupView() {
     void loadMatchup();
   }, [loadMatchup]);
 
-  const handleVote = async (winnerId: string) => {
-    if (!matchup || voting) {
-      return;
+  useEffect(() => {
+    if (matchup && !loading) {
+      prefetcher.current.schedule(matchup.matchupId);
     }
+  }, [matchup, loading]);
 
-    const loserId = matchup.players.find((player) => player.id !== winnerId)?.id;
-    if (!loserId) {
-      return;
-    }
+  const revealMatchup = useCallback((next: MatchupResponse) => {
+    setCardsVisible(false);
+    window.setTimeout(() => {
+      setMatchup(next);
+      setSelectedId(null);
+      prefetcher.current.schedule(next.matchupId);
+      requestAnimationFrame(() => setCardsVisible(true));
+    }, FADE_MS);
+  }, []);
 
-    setVoting(true);
-    setSelectedId(winnerId);
+  const rollbackMatchup = useCallback((previous: MatchupResponse) => {
+    setMatchup(previous);
+    setSelectedId(null);
+    setCardsVisible(true);
+    prefetcher.current.schedule(previous.matchupId);
+  }, []);
 
-    try {
-      const response = await fetch("/api/vote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ winnerId, loserId }),
-      });
-
-      if (response.status === 429) {
-        setRateLimited(true);
-        setSelectedId(null);
+  const handleVote = useCallback(
+    (winnerId: string) => {
+      if (!matchup || voting) {
         return;
       }
 
-      if (!response.ok) {
-        throw new Error("Vote failed");
+      const loserId = matchup.players.find((player) => player.id !== winnerId)?.id;
+      if (!loserId) {
+        return;
       }
 
-      const data = await response.json();
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setCardsVisible(false);
+      const previousMatchup = matchup;
 
-      await new Promise((resolve) => setTimeout(resolve, 220));
+      setVoting(true);
+      setSelectedId(winnerId);
+      setConfettiBurst((burst) => burst + 1);
 
-      if (data.nextMatchup) {
-        await Promise.all(
-          data.nextMatchup.players.map((player: { imageUrl: string }) =>
-            preloadImage(player.imageUrl),
-          ),
-        );
-        setMatchup(data.nextMatchup);
-      }
+      const votePromise = fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ winnerId, loserId }),
+        keepalive: true,
+      });
 
-      setSelectedId(null);
-      requestAnimationFrame(() => setCardsVisible(true));
-    } catch {
-      setSelectedId(null);
-      setCardsVisible(true);
-    } finally {
-      setVoting(false);
-    }
-  };
+      void (async () => {
+        let swapped = false;
+        const prefetched = prefetcher.current.consume();
+
+        if (prefetched) {
+          revealMatchup(prefetched);
+          swapped = true;
+        } else {
+          const warmed = await prefetcher.current.waitForReady(700);
+          if (warmed) {
+            revealMatchup(warmed);
+            swapped = true;
+          }
+        }
+
+        try {
+          const response = await votePromise;
+
+          if (response.status === 429) {
+            rollbackMatchup(previousMatchup);
+            setRateLimited(true);
+            setVoting(false);
+            return;
+          }
+
+          if (!response.ok) {
+            rollbackMatchup(previousMatchup);
+            setVoting(false);
+            return;
+          }
+
+          const data = (await response.json()) as VoteResponse;
+
+          if (!swapped && data.nextMatchup) {
+            await warmMatchupImages(data.nextMatchup);
+            revealMatchup(data.nextMatchup);
+          }
+
+          setVoting(false);
+        } catch {
+          rollbackMatchup(previousMatchup);
+          setVoting(false);
+        }
+      })();
+    },
+    [matchup, voting, revealMatchup, rollbackMatchup],
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-5 md:gap-8">
+      <VoteConfetti burst={confettiBurst} />
       <h2 className="flex items-center justify-center gap-2.5 text-center text-2xl font-bold text-[#4F4D46] md:gap-3 md:text-4xl">
         <span className="text-[1.1em] leading-none" aria-hidden="true">
           🔥
@@ -118,7 +161,7 @@ export function MatchupView() {
           <div
             key={matchup.matchupId}
             className={cx(
-              "grid w-full grid-cols-1 items-center gap-4 transition-opacity duration-300 ease-out md:grid-cols-[1fr_auto_1fr] md:gap-8",
+              "grid w-full grid-cols-1 items-center gap-4 transition-opacity duration-150 ease-out md:grid-cols-[1fr_auto_1fr] md:gap-8",
               cardsVisible ? "opacity-100" : "pointer-events-none opacity-0",
             )}
           >

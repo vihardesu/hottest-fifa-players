@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Inter } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
+import { getOgImageUrl, getOpenGraphImages } from "@/lib/og-metadata";
 import { getSiteUrl } from "@/lib/site-url";
 import "@/styles/globals.css";
 
@@ -27,15 +28,17 @@ export const metadata: Metadata = {
   openGraph: {
     title,
     description,
-    url: "/",
+    url: getSiteUrl(),
     siteName: title,
     locale: "en_US",
     type: "website",
+    images: getOpenGraphImages(),
   },
   twitter: {
     card: "summary_large_image",
     title,
     description,
+    images: [getOgImageUrl()],
   },
 };
 

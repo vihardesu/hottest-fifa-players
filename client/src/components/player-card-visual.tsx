@@ -43,7 +43,13 @@ export function PlayerCardVisual({
 
       <div className="relative overflow-hidden bg-[#E8E2D0]">
         <div className="player-face-crop aspect-square w-full md:aspect-[4/5]">
-          <img src={imageUrl} alt={name} className="player-face-image" />
+          <img
+            src={imageUrl}
+            alt={name}
+            className="player-face-image"
+            fetchPriority="high"
+            decoding="async"
+          />
         </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/5" />
       </div>

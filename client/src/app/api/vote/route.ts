@@ -1,5 +1,6 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { getMatchup, submitVote } from "@/lib/players";
+import { getMatchup, maybeRunRatingPeriod, submitVote } from "@/lib/players";
 
 function getClientId(request: Request): string {
   return (
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
       { success: false, message: result.message },
       { status: 400 },
     );
+  }
+
+  if (result.periodDue) {
+    after(() => maybeRunRatingPeriod());
   }
 
   return NextResponse.json({

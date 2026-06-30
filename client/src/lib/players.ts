@@ -4,6 +4,7 @@ import type {
   MatchupResponse,
   PlayerRecord,
   RatedPlayer,
+  VoteRecord,
 } from "@/lib/types";
 import {
   LEADERBOARD_LIMIT,
@@ -30,6 +31,7 @@ import {
   getActiveRatingPeriod,
   isRatingPeriodDue,
   writeRatingHistory,
+  type RatingPeriod,
 } from "@/lib/rating-periods";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -45,6 +47,10 @@ interface SessionVoteState {
   lastVoteAt: number;
   lastWinnerId: string | null;
   lastLoserId: string | null;
+  dailyVotes?: {
+    day: string;
+    votes: VoteRecord[];
+  };
 }
 
 const listeners = new Set<RankingListener>();
@@ -54,6 +60,7 @@ const sessionState = new Map<string, SessionVoteState>();
 let initialized = false;
 let players = new Map<string, PlayerState>();
 let activeRatingPeriodId: number | null = null;
+let activeRatingPeriod: RatingPeriod | null = null;
 
 function formatPlayerName(name: string): string {
   return name
@@ -85,6 +92,40 @@ function getSessionState(sessionId: string): SessionVoteState {
   }
 
   return existing;
+}
+
+async function ensureActiveRatingPeriod(): Promise<RatingPeriod> {
+  if (activeRatingPeriod) {
+    return activeRatingPeriod;
+  }
+
+  const period = await getActiveRatingPeriod();
+  activeRatingPeriod = period;
+  activeRatingPeriodId = period.id;
+  return period;
+}
+
+async function getSessionVotesCached(sessionId: string, day: string): Promise<VoteRecord[]> {
+  const session = getSessionState(sessionId);
+
+  if (session.dailyVotes?.day === day) {
+    return session.dailyVotes.votes;
+  }
+
+  const votes = await getSessionVotesForDay(sessionId, day);
+  session.dailyVotes = { day, votes };
+  return votes;
+}
+
+function appendSessionVoteCache(sessionId: string, day: string, vote: VoteRecord): void {
+  const session = getSessionState(sessionId);
+
+  if (session.dailyVotes?.day === day) {
+    session.dailyVotes.votes.push(vote);
+    return;
+  }
+
+  session.dailyVotes = { day, votes: [vote] };
 }
 
 function weightedPick(pool: PlayerState[], weightFn: (player: PlayerState) => number): PlayerState {
@@ -234,6 +275,7 @@ async function loadFromDatabase(): Promise<void> {
   );
 
   const period = await getActiveRatingPeriod();
+  activeRatingPeriod = period;
   activeRatingPeriodId = period.id;
 }
 
@@ -251,6 +293,7 @@ export async function maybeRunRatingPeriod(): Promise<boolean> {
   await reloadRatingsFromDatabase();
 
   const period = await getActiveRatingPeriod();
+  activeRatingPeriod = period;
   activeRatingPeriodId = period.id;
 
   if (!isRatingPeriodDue(period)) {
@@ -308,6 +351,7 @@ export async function maybeRunRatingPeriod(): Promise<boolean> {
   await persistPlayerRatings(updatedStates);
   await writeRatingHistory(period.id, historySnapshots);
   const nextPeriod = await closeRatingPeriod(period.id, periodVotes.length);
+  activeRatingPeriod = nextPeriod;
   activeRatingPeriodId = nextPeriod.id;
   notifyListeners();
 
@@ -321,7 +365,6 @@ export function subscribeToRankings(listener: RankingListener): () => void {
 
 export async function getMatchup(): Promise<MatchupResponse> {
   await ensurePlayersLoaded();
-  await maybeRunRatingPeriod();
 
   const pool = [...players.values()];
   const first = weightedPick(pool, (player) => player.rd);
@@ -348,7 +391,7 @@ export async function submitVote(
   winnerId: string,
   loserId: string,
   sessionId: string,
-): Promise<{ success: boolean; rateLimited?: boolean; message?: string }> {
+): Promise<{ success: boolean; rateLimited?: boolean; message?: string; periodDue?: boolean }> {
   await ensurePlayersLoaded();
 
   const now = Date.now();
@@ -375,7 +418,7 @@ export async function submitVote(
   }
 
   const day = todayKey();
-  const persistedSessionVotes = await getSessionVotesForDay(sessionId, day);
+  const persistedSessionVotes = await getSessionVotesCached(sessionId, day);
 
   if (persistedSessionVotes.length >= MAX_VOTES_PER_SESSION_PER_DAY) {
     return {
@@ -403,10 +446,9 @@ export async function submitVote(
     };
   }
 
-  const period = await getActiveRatingPeriod();
-  activeRatingPeriodId = period.id;
+  const period = await ensureActiveRatingPeriod();
 
-  await appendVote(
+  const voteRecord = await appendVote(
     winnerId,
     loserId,
     sessionId,
@@ -414,14 +456,14 @@ export async function submitVote(
     hashClientId(sessionId),
   );
 
+  appendSessionVoteCache(sessionId, day, voteRecord);
+
   session.lastVoteAt = now;
   session.lastWinnerId = winnerId;
   session.lastLoserId = loserId;
   voteTimestamps.set(sessionId, now);
 
-  await maybeRunRatingPeriod();
-
-  return { success: true };
+  return { success: true, periodDue: isRatingPeriodDue(period) };
 }
 
 export async function getLeaderboard(limit = LEADERBOARD_LIMIT): Promise<LeaderboardEntry[]> {
